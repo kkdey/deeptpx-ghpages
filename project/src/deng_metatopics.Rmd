@@ -1,0 +1,219 @@
+---
+title: 'Deng et al 2014 meta-topic model analysis: K=6'
+author: "Kushal K Dey"
+date: "April 18, 2016"
+output: 
+  html_document:
+    css: floating-toc.css
+    toc: true
+---
+
+
+## Overview
+
+We present the meta-topic model analysis (based on the Deep Poisson Factor Modeling algorithm by Lawrence Carin lab) for the Deng et al 2014 data. For the standard topic model, the Deng et al data has already shown a time varying admixing pattern in a continuous way. We now intend to see whether the meta topics also show the continuous pattern or they form distinct clusters for the different time phases of development.
+
+We perform 2 scenarios on the $K=6$ topic model fit on the Deng et al 2014 data. 
+
+One scenario in which we first form a meta-topic of size $4$ and then another level of meta-topic of size $2$.
+
+For the second scenario, we assume only one level of metatopic for $K=3$.
+
+
+```{r echo=TRUE, eval=TRUE, warning=FALSE, message=FALSE}
+#devtools::install_github("kkdey/singleCellRNASeqMouseDeng2014")
+library(singleCellRNASeqMouseDeng2014)
+counts <- exprs(Deng2014MouseESC)
+meta_data <- pData(Deng2014MouseESC)
+gene_names <- rownames(counts)
+```
+
+## Scenario 1
+
+```{r echo=TRUE, eval=TRUE, fig.height=10, fig.width=5, message=FALSE, warning=FALSE}
+deng_topics <- get(load("../rdas/deng_topic_fit.rda"))
+omega <- deng_topics[[5]]$omega;
+theta <- deng_topics[[5]]$theta;
+
+# import embryonl labels
+embryo_label <- read.table("../external_data/Deng_Data/cell_labels_phase_embryo.txt",
+                           quote = "\"",
+                           header = TRUE,
+                           stringsAsFactors = FALSE)$x
+head(embryo_label, 20)
+table(embryo_label)
+stopifnot(length(embryo_label) == NROW(omega))
+
+
+# make annotation matrix for the plot of all tissues
+# sample_id has to be unique
+annotation <- data.frame(
+  sample_id = paste0("X", c(1:NROW(omega))),
+  tissue_label = factor(rownames(omega),
+                        levels = rev( c("zy", "early2cell", "mid2cell", "late2cell",
+                                       "4cell", "8cell", "16cell", "earlyblast",
+                                       "midblast", "lateblast") ) ) )
+
+# make annotation for early stage plot
+# sample_id has to be unique
+annotation_embryo <- data.frame(
+    sample_id = paste0("X", c(1:NROW(omega))),
+    tissue_label = factor(embryo_label,
+      levels = rev( c("zy_.",
+                      paste("early2cell",c("0r", c(1:3)), sep = "_"),
+                      paste("mid2cell",c("0r", c(3:7)), sep = "_"),
+                      paste("late2cell",c("0r", c(5:9)), sep = "_"),
+                      paste("4cell",c("0r", c(1:4)), sep = "_"),
+                      paste("8cell",c("0r", c(1,2,5,8)), sep = "_"),
+                      paste("16cell",c("0r", c(1,4,5,6)), sep = "_"),
+                      paste("earlyblast",c("0r", c(2:4)), sep = "_"),
+                      paste("midblast",c("0r", c(1:3)), sep = "_"),
+                      paste("lateblast",c("0r", c(1:3)), sep = "_") ) ) ) )
+
+
+
+
+# after extracting tissue type of each sample
+# recode each sample to have unique rownames
+rownames(omega) <- paste0("X", annotation$sample_id)
+
+CountClust::StructureGGplot(omega = omega,
+               annotation = annotation,
+               palette = RColorBrewer::brewer.pal(8, "Accent"),
+               figure_title = "",
+               yaxis_label = "Cell type",
+               sample_order_decreasing = FALSE,
+               axis_tick = list(axis_ticks_length = .1,
+                                 axis_ticks_lwd_y = .1,
+                                 axis_ticks_lwd_x = .1,
+                                 axis_label_size = 7,
+                                 axis_label_face = "bold"))
+
+
+```
+
+### metatopic for K=4
+
+```{r echo=TRUE, eval=TRUE}
+libsize_deng <- colSums(counts);
+
+omega_1 <- omega
+theta_1 <- theta
+
+lambda_1 <- sweep(omega_1, 1, libsize_deng, "*");
+
+z_level_1 <- array(0,c(dim(lambda_1)[1], dim(theta_1)[1], dim(lambda_1)[2]));
+for(k in 1:dim(theta_1)[2]){
+  z_level_1[,,k] <- floor(lambda_1[,k]%*%t(theta_1[,k]))
+}
+
+z_level_1_counts <- apply(z_level_1, c(1,3), sum);
+```
+
+```{r echo=TRUE, eval=TRUE}
+topic_clus <- maptpx::topics(z_level_1_counts, K=4, tol=0.1);
+```
+
+```{r echo=TRUE, eval=TRUE, fig.height=10, fig.width=5, message=FALSE, warning=FALSE}
+omega <- topic_clus$omega
+# define colors of the clusers
+
+CountClust::StructureGGplot(omega = omega,
+                annotation= annotation,
+                palette = RColorBrewer::brewer.pal(8, "Accent"),
+                yaxis_label = "",
+                order_sample = TRUE,
+                split_line = list(split_lwd = .4,
+                                  split_col = "white"),
+                axis_tick = list(axis_ticks_length = .1,
+                                 axis_ticks_lwd_y = .1,
+                                 axis_ticks_lwd_x = .1,
+                                 axis_label_size = 3,
+                                 axis_label_face = "bold"))
+```
+
+### metatopic for K=2
+
+```{r echo=TRUE, eval=TRUE}
+libsize_deng <- rowSums(z_level_1_counts);
+
+omega_2 <- topic_clus$omega
+theta_2 <- topic_clus$theta
+
+lambda_2 <- sweep(omega_2, 1, libsize_deng, "*");
+
+z_level_2 <- array(0,c(dim(lambda_2)[1], dim(theta_2)[1], dim(lambda_2)[2]));
+for(k in 1:dim(theta_2)[2]){
+  z_level_2[,,k] <- floor(lambda_2[,k]%*%t(theta_2[,k]))
+}
+
+z_level_2_counts <- apply(z_level_2, c(1,3), sum);
+```
+
+```{r echo=TRUE, eval=TRUE}
+topic_clus <- maptpx::topics(z_level_2_counts, K=3, tol=0.1);
+```
+
+```{r echo=TRUE, eval=TRUE, fig.height=10, fig.width=5, message=FALSE, warning=FALSE}
+omega <- topic_clus$omega
+# define colors of the clusers
+
+CountClust::StructureGGplot(omega = omega,
+                annotation= annotation,
+                palette = RColorBrewer::brewer.pal(8, "Accent"),
+                yaxis_label = "",
+                order_sample = TRUE,
+                split_line = list(split_lwd = .4,
+                                  split_col = "white"),
+                axis_tick = list(axis_ticks_length = .1,
+                                 axis_ticks_lwd_y = .1,
+                                 axis_ticks_lwd_x = .1,
+                                 axis_label_size = 3,
+                                 axis_label_face = "bold"))
+```
+
+## Scenario 2
+
+### metatopic K=3
+
+```{r echo=TRUE, eval=TRUE}
+libsize_deng <- colSums(counts);
+
+deng_topics <- get(load("../rdas/deng_topic_fit.rda"))
+omega <- deng_topics[[5]]$omega;
+theta <- deng_topics[[5]]$theta;
+
+omega_1 <- omega
+theta_1 <- theta
+
+lambda_1 <- sweep(omega_1, 1, libsize_deng, "*");
+
+z_level_1 <- array(0,c(dim(lambda_1)[1], dim(theta_1)[1], dim(lambda_1)[2]));
+for(k in 1:dim(theta_1)[2]){
+  z_level_1[,,k] <- floor(lambda_1[,k]%*%t(theta_1[,k]))
+}
+
+z_level_1_counts <- apply(z_level_1, c(1,3), sum);
+```
+
+```{r echo=TRUE, eval=TRUE}
+topic_clus <- maptpx::topics(z_level_1_counts, K=3, tol=0.1);
+```
+
+```{r echo=TRUE, eval=TRUE, fig.height=10, fig.width=5, message=FALSE, warning=FALSE}
+omega <- topic_clus$omega
+# define colors of the clusers
+
+CountClust::StructureGGplot(omega = omega,
+                annotation= annotation,
+                palette = RColorBrewer::brewer.pal(8, "Accent"),
+                yaxis_label = "",
+                order_sample = TRUE,
+                split_line = list(split_lwd = .4,
+                                  split_col = "white"),
+                axis_tick = list(axis_ticks_length = .1,
+                                 axis_ticks_lwd_y = .1,
+                                 axis_ticks_lwd_x = .1,
+                                 axis_label_size = 3,
+                                 axis_label_face = "bold"))
+```

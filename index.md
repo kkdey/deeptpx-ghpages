@@ -10,4 +10,4 @@ We fit deep topic models on RNA-seq and ecological abundance data that forms lay
 ### Home
   * [deeptpx on GTEx V6 all tissues data](project/src/gtex_v6_metatopics.html)
   * [deeptpx on Deng et al 2014 data](project/src/deng_metatopics.html)
-  * [deeptpx on Alex/Trevor Bird abundance data](project/src/alex_metatopics.html)
+  * [deeptpx on Alex/Trevor Bird abundance data](project/src/alex_trevor_metatopics.html)

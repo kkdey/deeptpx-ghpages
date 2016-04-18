@@ -1,2 +1,2 @@
 # deeptpx-ghpages
-Deep topic model for clustering RNA-seq expression data
+Deep topic model (deeptpx) for clustering RNA-seq expression and ecological abundance counts data
